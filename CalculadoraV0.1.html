@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora de Consumo de Ração</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      color: #4CAF50;
+      text-align: center;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      margin: 10px 0 5px;
+    }
+    input, select, button {
+      padding: 10px;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    .result {
+      background-color: #f9f9f9;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th, td {
+      padding: 10px;
+    }
+    #listaProdutos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    #listaProdutos div {
+      border: 1px solid #ddd;
+      padding: 10px;
+      width: 200px;
+      text-align: center;
+    }
+    #listaProdutos img {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Calculadora de Consumo de Ração</h1>
+  <form id="calcForm">
+    <label for="peso">Peso do Pet (kg):</label>
+    <input type="number" id="peso" name="peso" min="1" required>
+
+    <label for="atividade">Nível de Atividade:</label>
+    <select id="atividade" name="atividade" required>
+      <option value="1.6">Sedentário</option>
+      <option value="2.0">Ativo</option>
+      <option value="3.0">Filhote (até 4 meses)</option>
+    </select>
+
+    <button type="button" id="calcular">Calcular e Comparar</button>
+  </form>
+
+  <div id="resultados" class="result" style="display:none;">
+    <h2>Resultados da Comparação</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Ração</th>
+          <th>Preço/kg (R$)</th>
+          <th>Consumo Diário (g)</th>
+          <th>Custo Diário (R$)</th>
+          <th>Duração do Pacote (dias)</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaComparacao"></tbody>
+    </table>
+  </div>
+
+  <div id="produtosRecomendados" style="display:none;">
+    <h2>Produtos Recomendados</h2>
+    <div id="listaProdutos"></div>
+  </div>
+
+  <script>
+    const apiUrl = 'https://api.nuvemshop.com.br/v1/products'; // URL da API da Nuvemshop
+    const token = 'SEU_TOKEN_DE_API'; // Substitua pelo seu token de API
+
+    // Função para calcular o consumo diário e atualizar os resultados
+    document.getElementById("calcular").addEventListener("click", function () {
+      const peso = parseFloat(document.getElementById("peso").value);
+      const atividade = parseFloat(document.getElementById("atividade").value);
+
+      const RER = 70 * Math.pow(peso, 0.75); // Taxa Metabólica de Repouso
+      const consumoDiarioKcal = RER * atividade; // Consumo diário em kcal
+      const densidadeEnergetica = 3500; // Densidade média da ração (kcal/kg)
+      const consumoDiarioGramas = (consumoDiarioKcal / densidadeEnergetica) * 1000; // Em g
+
+      buscarRacoes(consumoDiarioGramas);
+    });
+
+    // Função para buscar rações via API
+    function buscarRacoes(consumoDiarioGramas) {
+      fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authentication': `Bearer ${token}`
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        const racoes = data.filter(produto => produto.category === 'Rações');
+        atualizarInterface(racoes, consumoDiarioGramas);
+        exibirProdutos(racoes);
+      })
+      .catch(error => console.error('Erro ao buscar produtos:', error));
+    }
+
+    // Atualizar a tabela de comparação com os dados das rações
+    function atualizarInterface(racoes, consumoDiarioGramas) {
+      const tabela = document.getElementById("tabelaComparacao");
+      const tbody = tabela.querySelector("tbody");
+      tbody.innerHTML = ""; // Limpar tabela
+
+      racoes.forEach((racao, index) => {
+        const precoPorKg = racao.price / (racao.weight / 1000); // Preço por kg
+        const custoDiario = (consumoDiarioGramas / 1000) * precoPorKg;
+        const duracaoPacote = racao.weight / consumoDiarioGramas;
+
+        const novaLinha = document.createElement("tr");
+        novaLinha.innerHTML = `
+          <td>${racao.name}</td>
+          <td>R$ ${precoPorKg.toFixed(2)}</td>
+          <td>${consumoDiarioGramas.toFixed(2)} g</td>
+          <td>R$ ${custoDiario.toFixed(2)}</td>
+          <td>${Math.floor(duracaoPacote)} dias</td>
+        `;
+        tbody.appendChild(novaLinha);
+      });
+
+      document.getElementById("resultados").style.display = "block";
+    }
+
+    // Exibir os produtos recomendados
+    function exibirProdutos(racoes) {
+      const container = document.getElementById("listaProdutos");
+      container.innerHTML = ""; // Limpar lista anterior
+
+      racoes.forEach(racao => {
+        const produtoHTML = `
+          <div>
+            <img src="${racao.images[0]}" alt="${racao.name}">
+            <h3>${racao.name}</h3>
+            <p>Preço: R$ ${(racao.price / 100).toFixed(2)}</p>
+            <p>Embalagem: ${racao.weight} g</p>
+            <button onclick="window.location.href='${racao.url}'">Comprar Agora</button>
+          </div>
+        `;
+        container.innerHTML += produtoHTML;
+      });
+
+      document.getElementById("produtosRecomendados").style.display = "block";
+    }
+  </script>
+</body>
+</html>
