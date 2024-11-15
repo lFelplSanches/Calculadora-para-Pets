@@ -45,22 +45,6 @@
     th, td {
       padding: 10px;
     }
-    #listaProdutos {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-top: 20px;
-    }
-    #listaProdutos div {
-      border: 1px solid #ddd;
-      padding: 10px;
-      width: 200px;
-      text-align: center;
-    }
-    #listaProdutos img {
-      width: 100%;
-      height: auto;
-    }
   </style>
 </head>
 <body>
@@ -76,110 +60,47 @@
       <option value="3.0">Filhote (até 4 meses)</option>
     </select>
 
-    <button type="button" id="calcular">Calcular e Comparar</button>
+    <button type="button" id="calcular">Calcular</button>
   </form>
 
   <div id="resultados" class="result" style="display:none;">
-    <h2>Resultados da Comparação</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Ração</th>
-          <th>Preço/kg (R$)</th>
-          <th>Consumo Diário (g)</th>
-          <th>Custo Diário (R$)</th>
-          <th>Duração do Pacote (dias)</th>
-        </tr>
-      </thead>
-      <tbody id="tabelaComparacao"></tbody>
-    </table>
-  </div>
-
-  <div id="produtosRecomendados" style="display:none;">
-    <h2>Produtos Recomendados</h2>
-    <div id="listaProdutos"></div>
+    <h2>Resultados:</h2>
+    <p id="quantidade"></p>
+    <p id="custo"></p>
   </div>
 
   <script>
-    const apiUrl = 'https://api.nuvemshop.com.br/v1/products'; // URL da API da Nuvemshop
-    const token = 'SEU_TOKEN_DE_API'; // Substitua pelo seu token de API
-
-    // Função para calcular o consumo diário e atualizar os resultados
     document.getElementById("calcular").addEventListener("click", function () {
+      // Captura os valores do formulário
       const peso = parseFloat(document.getElementById("peso").value);
       const atividade = parseFloat(document.getElementById("atividade").value);
 
-      const RER = 70 * Math.pow(peso, 0.75); // Taxa Metabólica de Repouso
-      const consumoDiarioKcal = RER * atividade; // Consumo diário em kcal
-      const densidadeEnergetica = 3500; // Densidade média da ração (kcal/kg)
-      const consumoDiarioGramas = (consumoDiarioKcal / densidadeEnergetica) * 1000; // Em g
+      if (isNaN(peso) || isNaN(atividade)) {
+        alert("Por favor, preencha todos os campos corretamente.");
+        return;
+      }
 
-      buscarRacoes(consumoDiarioGramas);
-    });
+      // Cálculo da Taxa Metabólica de Repouso (RER)
+      const RER = 70 * Math.pow(peso, 0.75);
 
-    // Função para buscar rações via API
-    function buscarRacoes(consumoDiarioGramas) {
-      fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authentication': `Bearer ${token}`
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        const racoes = data.filter(produto => produto.category === 'Rações');
-        atualizarInterface(racoes, consumoDiarioGramas);
-        exibirProdutos(racoes);
-      })
-      .catch(error => console.error('Erro ao buscar produtos:', error));
-    }
+      // Ajuste com o fator de atividade
+      const consumoDiarioKcal = RER * atividade;
 
-    // Atualizar a tabela de comparação com os dados das rações
-    function atualizarInterface(racoes, consumoDiarioGramas) {
-      const tabela = document.getElementById("tabelaComparacao");
-      const tbody = tabela.querySelector("tbody");
-      tbody.innerHTML = ""; // Limpar tabela
+      // Dados fixos da ração (você pode adaptar para buscar de um banco de dados)
+      const precoRacao = 25; // Preço por kg (R$)
+      const densidadeEnergetica = 3500; // kcal/kg
 
-      racoes.forEach((racao, index) => {
-        const precoPorKg = racao.price / (racao.weight / 1000); // Preço por kg
-        const custoDiario = (consumoDiarioGramas / 1000) * precoPorKg;
-        const duracaoPacote = racao.weight / consumoDiarioGramas;
+      // Cálculos finais
+      const consumoDiarioGramas = (consumoDiarioKcal / densidadeEnergetica) * 1000; // gramas
+      const custoDiario = (consumoDiarioGramas / 1000) * precoRacao; // custo diário em R$
 
-        const novaLinha = document.createElement("tr");
-        novaLinha.innerHTML = `
-          <td>${racao.name}</td>
-          <td>R$ ${precoPorKg.toFixed(2)}</td>
-          <td>${consumoDiarioGramas.toFixed(2)} g</td>
-          <td>R$ ${custoDiario.toFixed(2)}</td>
-          <td>${Math.floor(duracaoPacote)} dias</td>
-        `;
-        tbody.appendChild(novaLinha);
-      });
-
+      // Atualiza os resultados no HTML
       document.getElementById("resultados").style.display = "block";
-    }
-
-    // Exibir os produtos recomendados
-    function exibirProdutos(racoes) {
-      const container = document.getElementById("listaProdutos");
-      container.innerHTML = ""; // Limpar lista anterior
-
-      racoes.forEach(racao => {
-        const produtoHTML = `
-          <div>
-            <img src="${racao.images[0]}" alt="${racao.name}">
-            <h3>${racao.name}</h3>
-            <p>Preço: R$ ${(racao.price / 100).toFixed(2)}</p>
-            <p>Embalagem: ${racao.weight} g</p>
-            <button onclick="window.location.href='${racao.url}'">Comprar Agora</button>
-          </div>
-        `;
-        container.innerHTML += produtoHTML;
-      });
-
-      document.getElementById("produtosRecomendados").style.display = "block";
-    }
+      document.getElementById("quantidade").innerText = 
+        `Quantidade diária recomendada: ${consumoDiarioGramas.toFixed(2)} g`;
+      document.getElementById("custo").innerText = 
+        `Custo diário estimado: R$ ${custoDiario.toFixed(2)}`;
+    });
   </script>
 </body>
 </html>
